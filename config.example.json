@@ -1,0 +1,19 @@
+{
+    "name": "My Game Server",
+    "authServer": "https://api.example.com",
+    "publicAddr": "203.0.113.10:23600",
+    "maxPlayers": 50,
+    "external": {
+        "port": 23500
+    },
+    "internal": {
+        "host": "127.0.0.1",
+        "port": 23600
+    },
+    "redis": {
+        "host": "127.0.0.1",
+        "port": 6380
+    },
+    "postgres": "postgresql://USER:PASSWORD@127.0.0.1:5432/gamedb?schema=public",
+    "secret": "generate-a-long-random-secret"
+}
