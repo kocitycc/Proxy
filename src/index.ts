@@ -51,6 +51,14 @@ const app = express();
 
 app.use(express.json());
 
+const blockedUnauthenticatedPaths = new Set([
+    '/api/auth',
+]);
+
+function isBlockedUnauthenticatedPath(path: string) {
+    return blockedUnauthenticatedPaths.has(path) || path.startsWith('/api/auth/');
+}
+
 app.get('/stats/status', async (req, res) => {
     res.send({
         status: "OK",
@@ -69,13 +77,20 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
     log.info(`Request from ${req.ip} to ${req.url}`);
     res.set('X-Powered-By', 'KoCity Proxy');
 
-    if (!req.body.credentials) {
+    const credentials = req.body?.credentials;
+
+    if (!credentials) {
+        if (req.method === 'POST' && isBlockedUnauthenticatedPath(req.path)) {
+            log.info("Blocked unauthenticated auth endpoint request");
+            return res.status(401).send("Unauthorized");
+        }
+
         return next();
     }
 
-    const authkey = req.body.credentials.username
+    const authkey = credentials.username
 
-    if (!authkey) {
+    if (typeof authkey !== 'string' || authkey.length === 0) {
         log.info("Invalid credentials");
         return res.status(401).send("Invalid credentials");
     }
@@ -124,7 +139,7 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
                 OR: [
                     { username: { equals: response.data.username, mode: 'insensitive' } },
                     { username: { endsWith: `:${response.data.username}`, mode: 'insensitive' } },
-                    { username: { equals: response.data.username, mode: 'insensitive' } } // Plain name backup
+                    { username: { equals: response.data.username, mode: 'insensitive' } }
                 ]
             }
         });

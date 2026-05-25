@@ -4,7 +4,7 @@
     "publicAddr": "203.0.113.10:23600",
     "maxPlayers": 50,
     "external": {
-        "port": 23500
+        "port": 23600
     },
     "internal": {
         "host": "127.0.0.1",
