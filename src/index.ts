@@ -97,7 +97,8 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
 
     const response: null | authResponse = await axios.post(`${config.authServer}/auth/validate`, {
         authkey,
-        server: config.publicAddr
+        server: config.publicAddr,
+        clientIp: req.ip || req.socket.remoteAddress || ''
     }, { timeout: AXIOS_TIMEOUT_MS }).catch((err: authError): null => {
         res.status(401).send("Unauthorized");
         if (err.response) log.err(`${(err.response.data as authErrorData).type} ${(err.response.data as authErrorData).message}`);
