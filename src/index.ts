@@ -99,7 +99,10 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
         authkey,
         server: config.publicAddr,
         clientIp: req.ip || req.socket.remoteAddress || ''
-    }, { timeout: AXIOS_TIMEOUT_MS }).catch((err: authError): null => {
+    }, {
+        timeout: AXIOS_TIMEOUT_MS,
+        headers: { 'x-secret': config.secret }
+    }).catch((err: authError): null => {
         res.status(401).send("Unauthorized");
         if (err.response) log.err(`${(err.response.data as authErrorData).type} ${(err.response.data as authErrorData).message}`);
         else log.err(err.message);
@@ -224,7 +227,10 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
         authkey,
         server: config.publicAddr,
         velanID
-    }, { timeout: AXIOS_TIMEOUT_MS }).catch((err: authError) => {
+    }, {
+        timeout: AXIOS_TIMEOUT_MS,
+        headers: { 'x-secret': config.secret }
+    }).catch((err: authError) => {
         log.err(`Failed to sync authkey to Auth Server: ${err.message}`);
     });
 
