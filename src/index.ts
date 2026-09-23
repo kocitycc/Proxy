@@ -129,8 +129,10 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
                 publisher_username: {
                     equals: response.data.username,
                     mode: 'insensitive'
-                }
-            }
+                },
+                nucleus_id: null
+            },
+            orderBy: { id: 'asc' }
         });
     }
 
@@ -139,10 +141,11 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
             where: {
                 OR: [
                     { username: { equals: response.data.username, mode: 'insensitive' } },
-                    { username: { endsWith: `:${response.data.username}`, mode: 'insensitive' } },
-                    { username: { equals: response.data.username, mode: 'insensitive' } }
-                ]
-            }
+                    { username: { endsWith: `:${response.data.username}`, mode: 'insensitive' } }
+                ],
+                nucleus_id: null
+            },
+            orderBy: { id: 'asc' }
         });
     }
 
@@ -181,8 +184,40 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
         velanID = Number(localUser.id);
     }
 
-    if (masterId && String(localUser.nucleus_id) !== String(masterId)) {
-        log.info(`Bonding VelanID ${velanID} to Master ID ${masterId}...`);
+    const currentBinding = localUser?.nucleus_id != null ? String(localUser.nucleus_id) : null;
+
+    if (masterId && currentBinding && currentBinding !== String(masterId)) {
+        log.err(`[SECURITY] Refusing to rebind profile ${velanID} (bound to master ${currentBinding}) to master ${masterId} for ${response.data.username}`);
+        return res.status(401).send("Unauthorized");
+    }
+
+    const rebinding = Boolean(masterId) && currentBinding === null;
+
+    const coloredName = `${response.data.color ? `:${response.data.color}FF:` : ''}${response.data.username}`;
+
+    const updateResult = await prisma.users.updateMany({
+        where: {
+            id: BigInt(velanID!),
+            ...(masterId
+                ? { OR: [{ nucleus_id: null }, { nucleus_id: BigInt(masterId) }] }
+                : { nucleus_id: null })
+        },
+        data: {
+            nucleus_id: masterId ? BigInt(masterId) : null,
+            username: coloredName,
+            last_authenticated_at: BigInt(Date.now()),
+            last_authenticated_platform: "win64",
+            last_authenticated_persona_namespace: "cc"
+        }
+    });
+
+    if (updateResult.count === 0) {
+        log.err(`[SECURITY] Profile ${velanID} was bound concurrently; refusing to rebind to master ${masterId} for ${response.data.username}`);
+        return res.status(401).send("Unauthorized");
+    }
+
+    if (rebinding) {
+        log.info(`Bonded profile ${velanID} to master ${masterId}`);
     }
 
     await axios.post(`${config.authServer}/auth/connect`, {
@@ -194,23 +229,6 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
     });
 
     response.data.velanID = velanID;
-
-    const coloredName = `${response.data.color ? `:${response.data.color}FF:` : ''}${response.data.username}`;
-
-    if (localUser && localUser.username !== coloredName) {
-        log.info(`Updated embedded color schema for user ${response.data.username}`);
-    }
-
-    await prisma.users.update({
-        where: { id: BigInt(velanID!) },
-        data: {
-            nucleus_id: masterId ? BigInt(masterId) : null,
-            username: coloredName,
-            last_authenticated_at: BigInt(Date.now()),
-            last_authenticated_platform: "win64",
-            last_authenticated_persona_namespace: "cc"
-        }
-    });
 
     log.info(`Request accepted for ${response.data.username}`);
 
